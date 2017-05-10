@@ -1,0 +1,85 @@
+GOCAD TSurf 1 
+HEADER {
+*solid*color: #f0e68c
+mesh: on
+use_feature_color: false
+name: 08_004_Basis_Haertensdorf_int
+}
+GOCAD_ORIGINAL_COORDINATE_SYSTEM
+NAME Default
+PROJECTION " RD/83 / 3-degree Gauss-Kruger zone 4" 
+DATUM " Mean Sea Level" 
+AXIS_NAME X Y Z
+AXIS_UNIT m m m
+ZPOSITIVE Elevation
+END_ORIGINAL_COORDINATE_SYSTEM
+GEOLOGICAL_FEATURE GeologicalHorizons
+PROPERTY_CLASS_HEADER X {
+kind: X
+unit: m
+}
+PROPERTY_CLASS_HEADER Y {
+kind: Y
+unit: m
+}
+PROPERTY_CLASS_HEADER Z {
+kind: Z
+unit: m
+is_z: on
+}
+PROPERTY_CLASS_HEADER vector3d {
+kind: Length
+unit: m
+}
+TFACE
+VRTX 1 2 2 2 
+VRTX 2 -2 -2 -2
+VRTX 3 0 4 10
+TRGL 1 2 3 
+
+BSTONE 3 
+BORDER 1090 3 901 
+END
+GOCAD TSurf 1 
+HEADER {
+*solid*color: 0.854902 0.666667 0 1
+mesh: on
+atoms: false
+crth: on
+name: 08_002_Basis_Leukersdorf_int
+}
+GOCAD_ORIGINAL_COORDINATE_SYSTEM
+NAME Default
+PROJECTION " RD/83 / 3-degree Gauss-Kruger zone 4" 
+DATUM " Mean Sea Level" 
+AXIS_NAME X Y Z
+AXIS_UNIT m m m
+ZPOSITIVE Elevation
+END_ORIGINAL_COORDINATE_SYSTEM
+GEOLOGICAL_FEATURE GeologicalHorizons
+PROPERTY_CLASS_HEADER X {
+kind: X
+unit: m
+}
+PROPERTY_CLASS_HEADER Y {
+kind: Y
+unit: m
+}
+PROPERTY_CLASS_HEADER Z {
+kind: Z
+unit: m
+is_z: on
+}
+PROPERTY_CLASS_HEADER vector3d {
+kind: Length
+unit: m
+}
+TFACE
+VRTX 1 0 0 0
+VRTX 2 5 0 0
+VRTX 3 0 0 5 
+TRGL 1 2 3 
+
+BSTONE 3 
+BORDER 1 3 730 
+END
