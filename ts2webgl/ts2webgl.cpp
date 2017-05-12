@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include <stdio.h>
 #include <stdint.h>
 #include <iostream>
@@ -16,10 +17,16 @@
 struct Vertex
 {
 	int32_t index;
-	float x, y, z;
+	double x, y, z;
 	Vertex(){}
-	Vertex(float _x, float _y, float _z) { x = _x; y = _y; z = _z; }
-	Vertex(int32_t i, float _x, float _y, float _z) { index = i; x = _x; y = _y; z = _z; }
+	Vertex(double _x, double _y, double _z) { x = _x; y = _y; z = _z; }
+	Vertex(int32_t i, double _x, double _y, double _z) { index = i; x = _x; y = _y; z = _z; }
+	bool operator!=(const Vertex &b) const { 
+
+		if (b.x != x && b.y != y && b.z != z) return true;
+		return false;
+		
+	}
 };
 
 struct Triangle
@@ -40,6 +47,7 @@ struct Color
 enum objtype { SURF, PTS, PLINE };
 enum geotype {am1UK, SyOK, SyUK, WELL, LINEE, REF, UNDEF};
 
+
 struct GObj
 {
 	std::vector<Vertex> vertices;
@@ -50,9 +58,52 @@ struct GObj
 	Color color;
 	std::string name;
 	std::string description;
+	bool isClosed = false;
 };
 
 std::vector<GObj> objects;
+
+struct identifier
+{
+	int32_t end_i = 0;
+	std::vector<int32_t> index;
+	std::vector<geotype> gtype;
+	std::vector<objtype> otype;
+	std::vector<Color> colors;
+};
+
+struct BBox
+{
+	Vertex min, max;
+};
+
+Vertex minCPU(const Vertex& a, const Vertex& b)
+{
+	return Vertex(std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z));
+}
+
+Vertex maxCPU(const Vertex& a, const Vertex& b)
+{
+	return Vertex(std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z));
+}
+
+
+BBox init_BBox(std::vector<Vertex>* nodes)
+{
+	BBox boundingbox;
+	boundingbox.min = Vertex(FLT_MIN, FLT_MIN, FLT_MIN);
+	boundingbox.max = Vertex(FLT_MAX, FLT_MAX, FLT_MAX);
+	for (auto n : *nodes)
+	{
+		boundingbox.min = maxCPU(boundingbox.min, Vertex(n.x, n.y, n.z));
+		boundingbox.max = minCPU(boundingbox.max, Vertex(n.x, n.y, n.z));
+		
+	}
+	return boundingbox;
+}
+
+double _div = 1.0f;
+std::vector<Vertex> allvertices;
 
 int main(int argc, char *argv[])
 {
@@ -60,10 +111,9 @@ int main(int argc, char *argv[])
 	std::cout << "============================================\n\n";
 	std::cout << "(c) Christian Lehmann 05.05.2017\n\n\n";
 
-	//openDialog();
+	openDialog();
 
-	filename = "modellierung4";
-
+	//filename = "3line";
 
 	std::ifstream ifs(filename.c_str(), std::ifstream::in);
 	if (!ifs.good())
@@ -137,14 +187,15 @@ int main(int argc, char *argv[])
 					else // Farbe ist als float angegeben
 					{
 						stringstream2 >> g >> std::ws >> b >> std::ws >> dummy; // dummy enthält die 1 am Ende der Farbzeile
-						new_object.color = Color(std::stof(rest.c_str())*255.f, g*255.f, b*255.f);
+						new_object.color = Color(std::stod(rest.c_str())*255.f, g*255.f, b*255.f);
 					}
 				}
 				if (key == "VRTX")
 				{
 					std::string rw, hw, teufe;
 					stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
-					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stof(rw), std::stof(hw), std::stof(teufe)));
+					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stod(rw)*_div, std::stod(hw)* _div, std::stod(teufe) * _div));
+					allvertices.push_back(Vertex(new_object.vertexnumber, std::stod(rw)*_div, std::stod(hw)* _div, std::stod(teufe) * _div));
 					new_object.vertexnumber = new_object.vertexnumber + 1;
 				}
 
@@ -152,7 +203,8 @@ int main(int argc, char *argv[])
 				{
 					std::string rw, hw, teufe, dummy3;
 					stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws >> dummy3 >> std::ws;
-					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stof(rw), std::stof(hw), std::stof(teufe)));
+					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stod(rw)* _div, std::stod(hw) * _div, std::stod(teufe) * _div));
+					allvertices.push_back(Vertex(new_object.vertexnumber, std::stod(rw)* _div, std::stod(hw) * _div, std::stod(teufe) * _div));
 					new_object.vertexnumber = new_object.vertexnumber + 1;
 				}
 
@@ -214,16 +266,18 @@ int main(int argc, char *argv[])
 					{
 						std::string rw, hw, teufe;
 						stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
-						float nteufe = std::stof(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
-						new_object.vertices.push_back(Vertex(std::stof(rw), std::stof(hw), nteufe));
+						double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
+						new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+						allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
 					}
 
 					if (key == "PVRTX")
 					{
 						std::string rw, hw, teufe, dummy4;
 						stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws >> dummy4 >> std::ws;
-						float nteufe = std::stof(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
-						new_object.vertices.push_back(Vertex(std::stof(rw), std::stof(hw), nteufe));
+						double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
+						new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+						allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
 					}
 					if (key == "SEG")
 					{
@@ -250,7 +304,7 @@ int main(int argc, char *argv[])
 			new_object.color = Color(255, 0, 0); // red
 			new_object.geo = WELL;
 			// jetzt bis Ende Surface durchgehen
-			float refX = 0, refY = 0, refZ = 0;
+			double refX = 0, refY = 0, refZ = 0;
 			while (!ifs.eof() /*&& std::getline(ifs, line)*/)
 			{
 				std::getline(ifs, line);
@@ -269,10 +323,11 @@ int main(int argc, char *argv[])
 				{
 					std::string rw, hw, teufe;
 					stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
-					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stof(rest), std::stof(rw), std::stof(hw)));
-					refX = std::stof(rest);
-					refY = std::stof(rw);
-					refZ = std::stof(hw);
+					new_object.vertices.push_back(Vertex(new_object.vertexnumber, std::stod(rest)* _div, std::stod(rw)* _div, std::stod(hw)* _div));
+					allvertices.push_back(Vertex(new_object.vertexnumber, std::stod(rest)* _div, std::stod(rw)* _div, std::stod(hw)* _div));
+					refX = std::stod(rest);
+					refY = std::stod(rw);
+					refZ = std::stod(hw);
 					new_object.vertexnumber = new_object.vertexnumber + 1;
 				}
 
@@ -280,7 +335,8 @@ int main(int argc, char *argv[])
 				{
 					std::string rw, hw, teufe;
 					stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
-					new_object.vertices.push_back(Vertex(new_object.vertexnumber, refX + std::stof(hw), refY + std::stof(teufe), std::stof(rw)));
+					new_object.vertices.push_back(Vertex(new_object.vertexnumber, (refX + std::stod(hw))* _div, (refY + std::stod(teufe))* _div, std::stod(rw)* _div));
+					allvertices.push_back(Vertex(new_object.vertexnumber, (refX + std::stod(hw))* _div, (refY + std::stod(teufe))* _div, std::stod(rw)* _div));
 					new_object.vertexnumber = new_object.vertexnumber + 1;
 				}
 
@@ -299,11 +355,19 @@ int main(int argc, char *argv[])
 	else
 	{
 		fprintf_s(stderr, "  ...done. \n\n");
-		std::cout << "Number of GOCAD objects found:" << objects.size() << "\n";
+		std::cout << "Number of GOCAD objects found:" << objects.size() << "\n\n";
 	}
 
-	// jetzt der zweite teil - alles in html packen
-	// =============================================
+		std::cout << "Started conversion to WEBGL mesh. This might take some time depending on mesh size and number of objects.\n\n";
+		identifier ident;
+		BBox box;
+		box = init_BBox(&allvertices);
+		Vertex box_middle = Vertex(box.max.x - box.min.x / 2, box.max.y - box.min.y / 2, 0); // small hack - ignore Z
+		box_middle = Vertex(box.min.x, box.min.y, -500);
+
+	// ==========================================================================================================================================
+	//											jetzt der zweite teil - alles in html packen
+	// ==========================================================================================================================================
 
 	std::ofstream html;
 	std::string delimiter = ".";
@@ -344,70 +408,95 @@ var meshes = [];
 )=====";
 	html << neu;
 	
+
+
+
 	std::string UNDEFline, UNDEFsurfvert, UNDEFsurftri;
 	bool UNDEFsurffound = false, UNDEFlinefound = false, DEFfound=false;
 	int32_t vertcounter = 0, tricounter = 0, undefcounter = 0;
-	int32_t end_i = -1;
+	ident.end_i = -1;
+	int32_t loopcounter = 0;
 
+	#pragma omp parallel for // OMP
 	for (int32_t i = 0; i < objects.size(); i++)
 	{
 		if (objects.at(i).geo != UNDEF)
 		{
 			DEFfound = true;
-			std::string data_1_surf_start = "var object" + std::to_string(end_i+1) + " = [ ";
+			std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+1) + " = [ ";
 			html << data_1_surf_start;
 			std::string data;
 
 			if (objects.at(i).type == SURF) data = std::to_string(objects.at(i).vertexnumber) + ", " + std::to_string(objects.at(i).trianglenumber) + ", "; // erst anzahl vertices, dann anzahl triangles
 			if (objects.at(i).type == PLINE) data = ""; // erst anzahl vertices, dann anzahl triangles
-			for (auto v : objects.at(i).vertices) data = data + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ", ";
+			for (auto v : objects.at(i).vertices) data = data + std::to_string(v.x - box_middle.x) + ", " + std::to_string(v.y - box_middle.y) + ", " + std::to_string(v.z - box_middle.z) + ", ";
 			for (auto t : objects.at(i).triangles)data = data + std::to_string(t.v1) + ", " + std::to_string(t.v2) + ", " + std::to_string(t.v3) + ", ";
+
+			ident.otype.push_back(objects.at(i).type);
+			ident.gtype.push_back(objects.at(i).geo);
+			ident.colors.push_back(objects.at(i).color);
 
 			data.pop_back();
 			data.pop_back(); // letztes Komma + Leerzeichen löschen
 			html << data;
 			char* data_1_surf_end = " ];";
 			html << data_1_surf_end; // definierte surfaces/lines sofort einspeisen. 
-			end_i++;
+			ident.end_i++;
 		}
 		if (objects.at(i).geo == UNDEF)
 		{
 			if (objects.at(i).type == PLINE)
 			{
 				UNDEFlinefound = true;
-				for (auto v : objects.at(i).vertices) UNDEFline = UNDEFline + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ", ";
+				for (int32_t ind=0; ind<objects.at(i).vertices.size();ind++) 
+				{ 
+					UNDEFline = UNDEFline + std::to_string(objects.at(i).vertices.at(ind).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(ind).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(ind).z - box_middle.z) + ", ";
+					//alle Vertices außer ersten und letzten duplizieren, für LinePieces
+					//if (ind !=0 && objects.at(i).vertices.at(ind) != objects.at(i).vertices.back()) UNDEFline = UNDEFline + std::to_string(objects.at(i).vertices.at(ind).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(ind).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(ind).z - box_middle.z) + ", "; // alle vertices duplizieren
+				}
 			}
 			if (objects.at(i).type == SURF) 
 			{
 				UNDEFsurffound = true;
 				vertcounter += objects.at(i).vertexnumber;
 				tricounter += objects.at(i).trianglenumber;
-				for (auto v : objects.at(i).vertices) UNDEFsurfvert = UNDEFsurfvert + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ", ";
+				for (auto v : objects.at(i).vertices) UNDEFsurfvert = UNDEFsurfvert + std::to_string(v.x - box_middle.x) + ", " + std::to_string(v.y - box_middle.y) + ", " + std::to_string(v.z - box_middle.z) + ", ";
 				for (auto t : objects.at(i).triangles) UNDEFsurftri = UNDEFsurftri + std::to_string(t.v1+undefcounter) + ", " + std::to_string(t.v2+undefcounter) + ", " + std::to_string(t.v3+undefcounter) + ", ";
 				undefcounter = vertcounter;
 			}
+		}
+		loopcounter++;
+		if (loopcounter >= 10000)
+		{
+			fprintf_s(stderr, "Processed 10.000 objects...\n");
+			loopcounter = 0;
 		}
 	}
 
 	// undefinierte PLINES
 	if (UNDEFlinefound)
 	{
-		if (!DEFfound) end_i--;
-		std::string data_1_surf_start = "var object" + std::to_string(end_i+1) + " = [ ";
+	//	if (!DEFfound) end_i++;
+		std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+1) + " = [ ";
 		html << data_1_surf_start;
 		UNDEFline.pop_back(); //
 		UNDEFline.pop_back(); // letztes Komma + Leerzeichen löschen
 		html << UNDEFline;
 		char* data_1_surf_end = " ];";
 		html << data_1_surf_end;
-		if (!DEFfound) end_i++;
+		//if (!DEFfound) end_i++;
+		ident.otype.push_back(PLINE);
+		ident.gtype.push_back(UNDEF);
+		ident.colors.push_back(Color(0,0,0));
 	}
 
 	// undefinierte SURFACES
 	if (UNDEFsurffound)
 	{
-		if (!DEFfound) end_i--;
-		std::string data_1_surf_start = "var object" + std::to_string(end_i+2) + " = [ ";
+		if (!DEFfound) ident.end_i--;
+		if (!UNDEFlinefound) ident.end_i--;
+		if (!UNDEFlinefound && !DEFfound) ident.end_i=-2;
+		std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+2) + " = [ ";
 		html << data_1_surf_start;
 		std::string tmp = std::to_string(vertcounter) + ", " + std::to_string(tricounter) + ", "; //anfang ist vertex- und trianglenummer
 		html << tmp;
@@ -417,8 +506,13 @@ var meshes = [];
 		html << UNDEFsurftri;
 		char* data_1_surf_end = " ];";
 		html << data_1_surf_end;
-		if (!DEFfound) end_i++;
+		if (!DEFfound) ident.end_i++;
+		ident.otype.push_back(SURF);
+		ident.gtype.push_back(UNDEF);
+		ident.colors.push_back(Color(0, 0, 0));
 	}
+
+	fprintf_s(stderr, "Finished converting mesh. Writing to HTML file...\n");
 
 
 	// ======================= now LAST PART - FOOTER =====================================
@@ -431,17 +525,18 @@ var i = 0;
 )====="; 
 	html << part2_start;
 
-
 	// ============================= load first DEFINED meshes ====================================
-	for (int i = 0; i < end_i;i++)
-	{
-		char *assign_start;
-		if (objects.at(i).type == SURF) { assign_start = R"=====(
+		for (int i = 0; i < ident.otype.size(); i++)
+		{
+			char *assign_start;
+			if (ident.otype.at(i) == SURF) {
+				assign_start = R"=====(
 			loadTSurf(
-			)====="; }
+			)=====";
+			}
 
-		else {
-		assign_start = R"=====(
+			else {
+				assign_start = R"=====(
 			loadPLine(
 			)=====";
 			}
@@ -450,68 +545,21 @@ var i = 0;
 			html << assign_start << name << assign_end;
 			std::string color_middle;
 			char* color_start = R"=====(
-			meshes[i++].material.color = new THREE.Color("rgb()====="; 
-			char* color_end = R"=====()");)====="; 
-			color_middle = std::to_string(objects.at(i).color.r) + std::string(", ") + std::to_string(objects.at(i).color.g) + std::string(", ") + std::to_string(objects.at(i).color.b);
-			if (objects.at(i).geo == UNDEF) color_middle = std::string("100") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
-			if (objects.at(i).geo == am1UK) color_middle = std::string("0") + std::string(", ") + std::string("255") + std::string(", ") + std::string("123");
-			if (objects.at(i).geo == SyUK) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
-			if (objects.at(i).geo == SyOK) color_middle = std::string("255") + std::string(", ") + std::string("124") + std::string(", ") + std::string("80");
+			meshes[i++].material.color = new THREE.Color("rgb()=====";
+			char* color_end = R"=====()");)=====";
+			//color_middle = std::to_string(objects.at(i).color.r) + std::string(", ") + std::to_string(objects.at(i).color.g) + std::string(", ") + std::to_string(objects.at(i).color.b);
+			color_middle = std::string("0") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
+			if (ident.gtype.at(i) == UNDEF) color_middle = std::string("100") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
+			if (ident.gtype.at(i) == am1UK) color_middle = std::string("0") + std::string(", ") + std::string("255") + std::string(", ") + std::string("123");
+			if (ident.gtype.at(i) == SyUK) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
+			if (ident.gtype.at(i) == SyOK) color_middle = std::string("255") + std::string(", ") + std::string("124") + std::string(", ") + std::string("80");
 			char* transparency = R"=====(
 			meshes[i].material.transparent = true;		
 			meshes[i].material.opacity = 0.6;
 			)=====";
-			if (objects.at(i).type == SURF && objects.at(i).geo != SyOK&& objects.at(i).geo != UNDEF) html << transparency << color_start << color_middle << color_end;
+			if (ident.otype.at(i) == SURF && ident.gtype.at(i) != SyOK&& ident.gtype.at(i) != UNDEF) html << transparency << color_start << color_middle << color_end;
 			else html << color_start << color_middle << color_end;
-	}
-	// ===============================================================================================
-
-	if (UNDEFlinefound)
-	{
-		char *assign_start;
-	
-			assign_start = R"=====(
-			loadPLine(
-			)=====";
-
-		std::string name = "object" + std::to_string(end_i);
-		std::string assign_end = "); ";
-		html << assign_start << name << assign_end;
-		std::string color_middle;
-		char* color_start = R"=====(
-			meshes[i++].material.color = new THREE.Color("rgb()=====";
-		char* color_end = R"=====()");)=====";
-		color_middle = std::string("0") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
-		char* transparency = R"=====(
-			meshes[i].material.transparent = true;		
-			meshes[i].material.opacity = 0.6;
-			)=====";
-		html << color_start << color_middle << color_end;
-	}
-
-	if (UNDEFsurffound)
-	{
-		char *assign_start;
-
-		assign_start = R"=====(
-			loadTSurf(
-			)=====";
-
-
-		std::string name = "object" + std::to_string(end_i + 1);
-		std::string assign_end = "); ";
-		html << assign_start << name << assign_end;
-		std::string color_middle;
-		char* color_start = R"=====(
-			meshes[i++].material.color = new THREE.Color("rgb()=====";
-		char* color_end = R"=====()");)=====";
-		color_middle = std::string("0") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
-		char* transparency = R"=====(
-			meshes[i].material.transparent = true;		
-			meshes[i].material.opacity = 0.6;
-			)=====";
-		html << color_start << color_middle << color_end;
-	}
+		}
 
 
 	// ==============================last part
