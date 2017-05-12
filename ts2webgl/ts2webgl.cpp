@@ -44,6 +44,12 @@ struct Color
 	Color(int _a, int _b, int _c){ r = _a; g = _b; b = _c; }
 };
 
+struct Segment
+{
+	int32_t seg1, seg2;
+	Segment(int32_t _a, int32_t _b) { seg1 = _a; seg2 = _b; }
+};
+
 enum objtype { SURF, PTS, PLINE };
 enum geotype {am1UK, SyOK, SyUK, WELL, LINEE, REF, UNDEF};
 
@@ -52,6 +58,7 @@ struct GObj
 {
 	std::vector<Vertex> vertices;
 	std::vector<Triangle> triangles;
+	std::vector<Segment> segments;
 	int32_t vertexnumber, trianglenumber;
 	objtype type;
 	geotype geo;
@@ -66,10 +73,10 @@ std::vector<GObj> objects;
 struct identifier
 {
 	int32_t end_i = 0;
-	std::vector<int32_t> index;
 	std::vector<geotype> gtype;
 	std::vector<objtype> otype;
 	std::vector<Color> colors;
+	std::vector<int32_t> old_i;
 };
 
 struct BBox
@@ -113,7 +120,7 @@ int main(int argc, char *argv[])
 
 	openDialog();
 
-	//filename = "3line";
+	//filename = "testneu2";
 
 	std::ifstream ifs(filename.c_str(), std::ifstream::in);
 	if (!ifs.good())
@@ -219,81 +226,65 @@ int main(int argc, char *argv[])
 			}
 			objects.push_back(new_object);
 		}
-		geotype lastgeo = UNDEF;
 		if (key == "GOCAD" && rest == "PLine")
 		{
-			bool end = false;
+			GObj new_object;
+			new_object.type = PLINE;
+			new_object.vertexnumber = 0;
+			new_object.trianglenumber = 0;
+			new_object.color = Color(0, 0, 0); // gocad speichert bei ascii-lines keine color
+			new_object.geo = UNDEF;
+
 			while (!ifs.eof())
 			{
-				GObj new_object;
-				new_object.type = PLINE;
-				new_object.vertexnumber = 0;
-				new_object.trianglenumber = 0;
-				new_object.color = Color(0, 0, 0);
-				new_object.geo = lastgeo;
+				std::getline(ifs, line);
+				std::stringstream stringstream(line);
+				key = "";
+				rest = "";
+				stringstream >> key >> std::ws >> rest >> std::ws;
+				if (key == "END") { break; }
 
-				bool changed = false;
-
-				// first process the header
-				while (key != std::string("ILINE"))
+				if (key == "name:")
 				{
-					std::getline(ifs, line);
-					std::stringstream stringstream2(line);
-					key = "";
-					rest = "";
-					stringstream2 >> key >> std::ws >> rest >> std::ws;
-
-					if (key == "name:")
-					{
-						new_object.name = rest;
-						if (rest.find("am1") != std::string::npos) new_object.geo = am1UK;
-						if (rest.find("Sy") != std::string::npos && rest.find("OK") != std::string::npos) new_object.geo = SyOK;
-						if (rest.find("Sy") != std::string::npos && rest.find("UK") != std::string::npos) new_object.geo = SyUK;
-						if (rest.find("Ref") != std::string::npos || rest.find("ref") != std::string::npos || rest.find("Rad") != std::string::npos || rest.find("rad") != std::string::npos) new_object.geo = REF; // Reflektor
-						lastgeo = new_object.geo;
-					}
-					if (key == "END") { end = true; break; }
-				}
-				while (!key.empty())
-				{
-					if (key == "END") { break; }
-					std::getline(ifs, line);
-					std::stringstream stringstream2(line);
-					key = "";
-					rest = "";
-					stringstream2 >> key >> std::ws >> rest >> std::ws;
-					if (key == "VRTX")
-					{
-						std::string rw, hw, teufe;
-						stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
-						double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
-						new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
-						allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
-					}
-
-					if (key == "PVRTX")
-					{
-						std::string rw, hw, teufe, dummy4;
-						stringstream2 >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws >> dummy4 >> std::ws;
-						double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
-						new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
-						allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
-					}
-					if (key == "SEG")
-					{
-						break;
-					}
+					new_object.name = rest;
+					if (rest.find("am1") != std::string::npos) new_object.geo = am1UK;
+					if (rest.find("Sy") != std::string::npos && rest.find("OK") != std::string::npos) new_object.geo = SyOK;
+					if (rest.find("Sy") != std::string::npos && rest.find("UK") != std::string::npos) new_object.geo = SyUK;
+					if (rest.find("Ref") != std::string::npos || rest.find("ref") != std::string::npos || rest.find("Rad") != std::string::npos || rest.find("rad") != std::string::npos) new_object.geo = REF; // Reflektor
 				}
 
+				if (key == "VRTX")
+				{
+					std::string rw, hw, teufe;
+					stringstream >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws;
+					double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
+					new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+					allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+				}
+				
 
-
-
-				if (!end) objects.push_back(new_object);
-				if (key == "END") break;
-				// segments not needed - order of vertices defines segments
+				if (key == "PVRTX")
+				{
+					std::string rw, hw, teufe, dummy4;
+					stringstream >> rw >> std::ws >> hw >> std::ws >> teufe >> std::ws >> dummy4 >> std::ws;
+					double nteufe = std::stod(teufe);  if (nteufe > 0) nteufe = nteufe*-1;
+					new_object.vertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+					allvertices.push_back(Vertex(std::stod(rw) * _div, std::stod(hw) * _div, nteufe * _div));
+				}
+				
+				if (key == "SEG")
+				{
+					std::string seg1, seg2;
+					seg1 = rest;
+					stringstream >> seg2 >> std::ws;
+					new_object.segments.push_back(Segment(std::stoi(seg1), std::stoi(seg2)));
+					
+				}
 			}
-			
+			objects.push_back(new_object);
 		}
+			
+
 
 		if (key == "GOCAD" && rest == "Well")
 		{
@@ -358,7 +349,7 @@ int main(int argc, char *argv[])
 		std::cout << "Number of GOCAD objects found:" << objects.size() << "\n\n";
 	}
 
-		std::cout << "Started conversion to WEBGL mesh. This might take some time depending on mesh size and number of objects.\n\n";
+		std::cout << "Started conversion to WEBGL mesh. This might take a while depending on mesh size and number of objects.\n\n";
 		identifier ident;
 		BBox box;
 		box = init_BBox(&allvertices);
@@ -435,6 +426,7 @@ var meshes = [];
 			ident.otype.push_back(objects.at(i).type);
 			ident.gtype.push_back(objects.at(i).geo);
 			ident.colors.push_back(objects.at(i).color);
+			ident.old_i.push_back(i);
 
 			data.pop_back();
 			data.pop_back(); // letztes Komma + Leerzeichen löschen
@@ -451,8 +443,6 @@ var meshes = [];
 				for (int32_t ind=0; ind<objects.at(i).vertices.size();ind++) 
 				{ 
 					UNDEFline = UNDEFline + std::to_string(objects.at(i).vertices.at(ind).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(ind).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(ind).z - box_middle.z) + ", ";
-					//alle Vertices außer ersten und letzten duplizieren, für LinePieces
-					//if (ind !=0 && objects.at(i).vertices.at(ind) != objects.at(i).vertices.back()) UNDEFline = UNDEFline + std::to_string(objects.at(i).vertices.at(ind).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(ind).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(ind).z - box_middle.z) + ", "; // alle vertices duplizieren
 				}
 			}
 			if (objects.at(i).type == SURF) 
@@ -488,6 +478,7 @@ var meshes = [];
 		ident.otype.push_back(PLINE);
 		ident.gtype.push_back(UNDEF);
 		ident.colors.push_back(Color(0,0,0));
+		ident.old_i.push_back(ident.end_i + 1);
 	}
 
 	// undefinierte SURFACES
@@ -525,7 +516,28 @@ var i = 0;
 )====="; 
 	html << part2_start;
 
-	// ============================= load first DEFINED meshes ====================================
+	// collect segments of undefined meshes
+	// convert segment indices - next object gets (segID-oldMaxSegID)
+	std::vector <Segment> UNDEFsegments;
+	int32_t oldMaxSegID = 0;
+	int32_t currentMaxID = 0;
+	for (auto &o : objects)
+	{
+		if (o.type == PLINE && o.geo == UNDEF)
+		{
+			for (auto &s : o.segments)
+			{
+				currentMaxID = std::max(currentMaxID, std::max(s.seg1, s.seg2));
+				s.seg1 = s.seg1 + oldMaxSegID;
+				s.seg2 = s.seg2 + oldMaxSegID;
+				UNDEFsegments.push_back(s);
+			}
+			oldMaxSegID = currentMaxID;
+		}
+	}
+
+
+
 		for (int i = 0; i < ident.otype.size(); i++)
 		{
 			char *assign_start;
@@ -535,10 +547,41 @@ var i = 0;
 			)=====";
 			}
 
-			else {
+			else 
+			{
+				// indices
+				char* indices_start = R"=====(
+				indices=[
+				)=====";
+				html << indices_start;
+				std::string segparts;
+				segparts = "";
+
+				for (auto &s : objects.at(ident.old_i.at(i)).segments)
+				{
+					segparts = segparts + std::to_string(s.seg1-1) + std::string(", ") + std::to_string(s.seg2-1) + std::string(", ");
+					if (ident.gtype.at(i) == UNDEF)
+					{
+						for (auto &sp : UNDEFsegments)
+						{
+							segparts = segparts + std::to_string(sp.seg1 - 1) + std::string(", ") + std::to_string(sp.seg2 - 1) + std::string(", ");
+						}
+					}
+				}
+				if (segparts != "") 
+				{
+					segparts.pop_back();
+					segparts.pop_back();
+				}
+				html << segparts;
+				char* indices_end = R"=====(
+				];
+				)=====";
+				html << indices_end;
+
 				assign_start = R"=====(
-			loadPLine(
-			)=====";
+				loadPLine(
+				)=====";
 			}
 			std::string name = "object" + std::to_string(i);
 			std::string assign_end = "); ";
