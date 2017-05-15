@@ -64,15 +64,6 @@ struct GObj
 
 std::vector<GObj> objects;
 
-struct identifier
-{
-	int32_t end_i = 0;
-	std::vector<geotype> gtype;
-	std::vector<objtype> otype;
-	std::vector<Color> colors;
-	std::vector<int32_t> old_i;
-};
-
 struct BBox
 {
 	Vertex min, max;
@@ -111,8 +102,6 @@ std::string rgbToHex(Color rgb)
 	std::string ret(hexcol);
 	return ret;
 }
-
-
 
 
 double _div = 1.0f; //optionale skalierung
@@ -366,8 +355,14 @@ int main(int argc, char *argv[])
 					new_object.vertices.push_back(Vertex(new_object.vertexnumber, (refX + std::stod(hw))* _div, (refY + std::stod(teufe))* _div, std::stod(rw)* _div));
 					allvertices.push_back(Vertex(new_object.vertexnumber, (refX + std::stod(hw))* _div, (refY + std::stod(teufe))* _div, std::stod(rw)* _div));
 					new_object.vertexnumber = new_object.vertexnumber + 1;
+					
 				}
 
+			}
+			//generate segments
+			for (int i = 1; i < new_object.vertexnumber; i++)
+			{
+				new_object.segments.push_back(Segment(i, i+1));
 			}
 			objects.push_back(new_object);
 		}
@@ -387,7 +382,6 @@ int main(int argc, char *argv[])
 	}
 
 	std::cout << "Started conversion to WEBGL mesh. This might take a while depending on object size and line segment counter.\n\n";
-	identifier ident;
 	BBox box;
 	box = init_BBox(&allvertices);
 	Vertex box_middle = Vertex(box.max.x - box.min.x / 2, box.max.y - box.min.y / 2, 0); // small hack - ignore Z
@@ -424,11 +418,22 @@ Fl&ouml;z Ronnenberg (<i>K3RoSy</i>) UK&nbsp;&nbsp;<div style='width:20px;height
 	std::string description;
 	for (int i = 0; i < objects.size(); i++)
 	{
-		// feste Farben setzen
+		// feste Farben für features setzen
 		if (objects.at(i).geo == am1UK || objects.at(i).geo == am1REF) objects.at(i).color = Color(0, 255, 123);
 		if (objects.at(i).geo == SyUK || objects.at(i).geo == SyUKREF) objects.at(i).color = Color(255, 255, 0);
 		if (objects.at(i).geo == SyOK || objects.at(i).geo == SyOKREF) objects.at(i).color = Color(255, 124, 80);
-		description = objects.at(i).name + " " + "<div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br>";
+		
+		if (objects.at(i).type == SURF)
+		{
+			description = "<img height='20' width='20' src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAApCAIAAAATe1a9AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAD0SURBVFhH7ZJZDsIwDAU5MmfhQFwtROQV2tcstrM0lTKaH1THng8ebj5Wk4zVJKNN0/P19uJHNQ2aQlDDrNqmfVAQHyqoaqKan/hsxd5EHSSGTPRq8mJOj7GJzkfFqB5LE93OiAdK1E10tSieadA10T2heCzm5k10SSVWyJA20Q2DWCRA1ETbzWJdiaFNXmzMUm6ipZViaZZCE21sIlanyTXRrobiQIJkE21pLs7EuE8Tve8kjp2INNHLruLkEW6iNwPE4R3XN3lxe+PQRKPDxPmNfxPNDRYRX9BEE5cYSjyrKWso8Uz8f5qK1SRjNcmYr8m5D5lYxj7zCie+AAAAAElFTkSuQmCC'></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br>";
+		}
+		if (objects.at(i).type == PLINE)
+		{
+			description = "<img height='20' width='20' src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAAwCAIAAAA3ogXuAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEpSURBVFhH1ZdLDsIwDAULN+NALDgJCw7E0YIlI6tyvk6cl3Q2Dd10GBsQtxDCsRn3/3UndnRCzO71+fLh/Xzwocz0TiJEnM8FJnaK89CdllSzOjUmSeLfqWCzZp/GhQjPTjmhdhvGx8klj+Dg5JVHGHLyzSP07/gkIaKzk/u8zpid5uURbE5T8witToA8QtOOI4WISiewDVPqtESIyHYSIX68ejmVyj4pA4AQYfgexwgR9dkJMKdsp9igsPK+lGa3SsuwTzBsnzsCkKreCa91wdkx4FStnZBal50dA0tl64TR2nF2tv8ITLJNnLCbHidCtFglN8E+0SEneaRpq6qiC5wUsWKnEzHiQbCKem9Mv5PCqohwSlIQXeaURIkqIWKBU5WL/waDOI4f+0TPAQVeoXIAAAAASUVORK5CYII='></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br>";
+		}
+
+
+
 		html << description;
 	}
 	char* descr_end = R"=====(")====="; // abschließendes " - zeichen hinzufügen
@@ -447,22 +452,10 @@ var meshes = [];
 )=====";
 	html << neu;
 	
-
-
-
-	std::string UNDEFline, UNDEFsurfvert, UNDEFsurftri;
-	bool UNDEFsurffound = false, UNDEFlinefound = false, DEFfound=false;
-	int32_t vertcounter = 0, tricounter = 0, undefcounter = 0;
-	ident.end_i = -1;
-	int32_t loopcounter = 0;
-
-	#pragma omp parallel for // OMP
+	#pragma omp parallel for
 	for (int32_t i = 0; i < objects.size(); i++)
 	{
-		if (objects.at(i).geo != UNDEF)
-		{
-			DEFfound = true;
-			std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+1) + " = [ ";
+			std::string data_1_surf_start = "var object" + std::to_string(i) + " = [ ";
 			html << data_1_surf_start;
 			std::string data;
 
@@ -471,87 +464,15 @@ var meshes = [];
 			for (auto v : objects.at(i).vertices) data = data + std::to_string(v.x - box_middle.x) + ", " + std::to_string(v.y - box_middle.y) + ", " + std::to_string(v.z - box_middle.z) + ", ";
 			for (auto t : objects.at(i).triangles)data = data + std::to_string(t.v1) + ", " + std::to_string(t.v2) + ", " + std::to_string(t.v3) + ", ";
 
-			ident.otype.push_back(objects.at(i).type);
-			ident.gtype.push_back(objects.at(i).geo);
-			ident.colors.push_back(objects.at(i).color);
-			ident.old_i.push_back(i);
-
 			if (data != "") data.pop_back();
 			if (data != "") data.pop_back(); // letztes Komma + Leerzeichen löschen
 			html << data;
 			char* data_1_surf_end = " ];";
 			html << data_1_surf_end; // definierte surfaces/lines sofort einspeisen. 
-			ident.end_i++;
-		}
-		if (objects.at(i).geo == UNDEF)
-		{
-			if (objects.at(i).type == PLINE)
-			{
-				UNDEFlinefound = true;
-				for (int32_t ind=0; ind<objects.at(i).vertices.size();ind++) 
-				{ 
-					UNDEFline = UNDEFline + std::to_string(objects.at(i).vertices.at(ind).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(ind).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(ind).z - box_middle.z) + ", ";
-				}
-			}
-			if (objects.at(i).type == SURF) 
-			{
-				UNDEFsurffound = true;
-				vertcounter += objects.at(i).vertexnumber;
-				tricounter += objects.at(i).trianglenumber;
-				for (auto v : objects.at(i).vertices) UNDEFsurfvert = UNDEFsurfvert + std::to_string(v.x - box_middle.x) + ", " + std::to_string(v.y - box_middle.y) + ", " + std::to_string(v.z - box_middle.z) + ", ";
-				for (auto t : objects.at(i).triangles) UNDEFsurftri = UNDEFsurftri + std::to_string(t.v1+undefcounter) + ", " + std::to_string(t.v2+undefcounter) + ", " + std::to_string(t.v3+undefcounter) + ", ";
-				undefcounter = vertcounter;
-			}
-		}
-		loopcounter++;
-		if (loopcounter >= 10000)
-		{
-			fprintf_s(stderr, "Processed 10.000 objects...\n");
-			loopcounter = 0;
-		}
+			fprintf_s(stderr, "Processed %u out of %u objects...\n",i ,objects.size());
 	}
 
-	// undefinierte PLINES
-	if (UNDEFlinefound)
-	{
-	//	if (!DEFfound) end_i++;
-		std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+1) + " = [ ";
-		html << data_1_surf_start;
-		UNDEFline.pop_back(); //
-		UNDEFline.pop_back(); // letztes Komma + Leerzeichen löschen
-		html << UNDEFline;
-		char* data_1_surf_end = " ];";
-		html << data_1_surf_end;
-		//if (!DEFfound) end_i++;
-		ident.otype.push_back(PLINE);
-		ident.gtype.push_back(UNDEF);
-		ident.old_i.push_back(ident.end_i + 1);
-		ident.colors.push_back(Color(0, 0, 0)); // all black
-	}
-
-	// undefinierte SURFACES
-	if (UNDEFsurffound)
-	{
-		if (!DEFfound) ident.end_i--;
-		if (!UNDEFlinefound) ident.end_i--;
-		if (!UNDEFlinefound && !DEFfound) ident.end_i=-2;
-		std::string data_1_surf_start = "var object" + std::to_string(ident.end_i+2) + " = [ ";
-		html << data_1_surf_start;
-		std::string tmp = std::to_string(vertcounter) + ", " + std::to_string(tricounter) + ", "; //anfang ist vertex- und trianglenummer
-		html << tmp;
-		UNDEFsurftri.pop_back(); //
-		UNDEFsurftri.pop_back(); // letztes Komma + Leerzeichen löschen
-		html << UNDEFsurfvert;
-		html << UNDEFsurftri;
-		char* data_1_surf_end = " ];";
-		html << data_1_surf_end;
-		if (!DEFfound) ident.end_i++;
-		ident.otype.push_back(SURF);
-		ident.gtype.push_back(UNDEF);
-		ident.colors.push_back(Color(0, 0, 0));
-	}
-
-	fprintf_s(stderr, "Finished converting mesh. Writing to HTML file...\n");
+	fprintf_s(stderr, "Finished converting mesh. Started generating HTML file...\n");
 
 
 	// ======================= now LAST PART - FOOTER =====================================
@@ -564,32 +485,14 @@ var i = 0;
 )====="; 
 	html << part2_start;
 
-	// collect segments of undefined meshes
-	// convert segment indices - next object gets (segID-oldMaxSegID)
-	std::vector <Segment> UNDEFsegments;
-	int32_t oldMaxSegID = 0;
-	int32_t currentMaxID = 0;
-	for (auto &o : objects)
-	{
-		if (o.type == PLINE && o.geo == UNDEF)
-		{
-			for (auto &s : o.segments)
-			{
-				currentMaxID = std::max(currentMaxID, std::max(s.seg1, s.seg2));
-				s.seg1 = s.seg1 + oldMaxSegID;
-				s.seg2 = s.seg2 + oldMaxSegID;
-				UNDEFsegments.push_back(s);
-			}
-			oldMaxSegID = currentMaxID;
-		}
-	}
 
-	fprintf_s(stderr, "...Done converting indices. Started writing vertices and indices.\n");
 	int32_t htmlcounter = 0;
-		for (int i = 0; i < ident.otype.size(); i++)
+		for (int i = 0; i < objects.size(); i++)
 		{
 			char *assign_start;
-			if (ident.otype.at(i) == SURF) {
+			if (objects.at(i).type == SURF) 
+			{
+				// Surface
 				assign_start = R"=====(
 			loadTSurf(
 			)=====";
@@ -597,26 +500,18 @@ var i = 0;
 
 			else 
 			{
-				// indices
+				// PLine
 				char* indices_start = R"=====(
 				indices=[
 				)=====";
 				html << indices_start;
 				std::string segparts;
 				segparts = "";
-
+				fprintf_s(stderr, "Processing segments..\n");
 				#pragma omp parallel for
-				for (auto &s : objects.at(ident.old_i.at(i)).segments)
+				for (auto &s : objects.at(i).segments) // jedes object hat x segments als paare, diese müssen in 'segparts' geschrieben werden
 				{
 					segparts = segparts + std::to_string(s.seg1-1) + std::string(", ") + std::to_string(s.seg2-1) + std::string(", ");
-					if (ident.gtype.at(i) == UNDEF)
-					{
-						for (auto &sp : UNDEFsegments)
-						{
-							segparts = segparts + std::to_string(sp.seg1 - 1) + std::string(", ") + std::to_string(sp.seg2 - 1) + std::string(", ");
-						}
-					}
-					fprintf_s(stderr, "Processing segments..\n");
 				}
 				if (segparts != "") 
 				{
@@ -640,16 +535,16 @@ var i = 0;
 			char* color_start = R"=====(
 			meshes[i++].material.color = new THREE.Color("rgb()=====";
 			char* color_end = R"=====()");)=====";
-			color_middle = std::to_string(ident.colors.at(i).r) + std::string(", ") + std::to_string(ident.colors.at(i).g) + std::string(", ") + std::to_string(ident.colors.at(i).b);
+			color_middle = std::to_string(objects.at(i).color.r) + std::string(", ") + std::to_string(objects.at(i).color.g) + std::string(", ") + std::to_string(objects.at(i).color.b);
 			//if (ident.gtype.at(i) == UNDEF) color_middle = std::string("0") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
-			if (ident.gtype.at(i) == am1UK || ident.gtype.at(i) == am1REF) color_middle = std::string("0") + std::string(", ") + std::string("255") + std::string(", ") + std::string("123");
-			if (ident.gtype.at(i) == SyUK || ident.gtype.at(i) == SyUKREF) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
-			if (ident.gtype.at(i) == SyOK || ident.gtype.at(i) == SyOKREF) color_middle = std::string("255") + std::string(", ") + std::string("124") + std::string(", ") + std::string("80");
+			if (objects.at(i).geo == am1UK || objects.at(i).geo == am1REF) color_middle = std::string("0") + std::string(", ") + std::string("255") + std::string(", ") + std::string("123");
+			if (objects.at(i).geo == SyUK || objects.at(i).geo == SyUKREF) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
+			if (objects.at(i).geo == SyOK || objects.at(i).geo == SyOKREF) color_middle = std::string("255") + std::string(", ") + std::string("124") + std::string(", ") + std::string("80");
 			char* transparency = R"=====(
 			meshes[i].material.transparent = true;		
 			meshes[i].material.opacity = 0.6;
 			)=====";
-			if (ident.otype.at(i) == SURF && ident.gtype.at(i) != SyOK&& ident.gtype.at(i) != UNDEF) html << transparency << color_start << color_middle << color_end;
+			if (objects.at(i).type == SURF && objects.at(i).type != SyOK&& objects.at(i).geo != UNDEF) html << transparency << color_start << color_middle << color_end;
 			else html << color_start << color_middle << color_end;
 
 			htmlcounter++;
