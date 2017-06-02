@@ -491,8 +491,8 @@ int main(int argc, char *argv[])
 	html << header;
 
 
-
-
+	std::string boxstring = "var box = new THREE.Vector2(); box.x=" + std::to_string(box_middle.x) + "; box.y=" + std::to_string(box_middle.y) + ";";
+	html << boxstring;
 
 	// update well Names
 	std::string f_names_start = "function updateWellNames(){if (showWellNames==true){";
@@ -509,7 +509,7 @@ int main(int argc, char *argv[])
 			std::string sprites4_3 = "); scene.add(spritey";
 			std::string sprites5 = "); ";
 			html << sprites1 << i << sprites2 << objects.at(i).name << sprites3 << i << sprites4 << sprites4_2 << sprites4_3 << i << sprites5;
-			std::string t = "spritey" + std::to_string(i);			std::string t1 = ".translateX(-center_c.x - 35);";			std::string t2 = ".translateY(-center_c.y - 35);";			std::string t3 = ".translateZ(-center_c.z - 35);";
+			std::string t = "spritey" + std::to_string(i);			std::string t1 = ".translateX(-center_c.x);";			std::string t2 = ".translateY(-center_c.y);";			std::string t3 = ".translateZ(-center_c.z);";
 			html << t << t1 << t << t2 << t << t3;
 		}
 	}
@@ -519,9 +519,8 @@ int main(int argc, char *argv[])
 	{
 		if (objects.at(i).geo == WELL)
 		{
-			std::string sprites1 = "scene.remove(scene.getObjectByName('spritey";
-			std::string sprites2 = "')); ";
-			html << sprites1 << i << sprites2;
+			std::string sprites1 = "for (k = scene.children.length, k >= 0; k--;) {	if (scene.children[k].type == 'Sprite')scene.remove(scene.children[k]);}";
+			html << sprites1;
 		}
 	}
 	std::string f_names_hide_end = "}}";
@@ -616,7 +615,7 @@ char* begin_div2 = R"=====(
 var text3 = document.createElement('div');
 text3.style.position = 'absolute';
 text3.style.width = 500;
-text3.style.height = 500;
+text3.style.height = 900;
 text3.style.overflow = "hidden";
 text3.innerHTML = ")=====";
 html << begin_div2;
@@ -658,6 +657,10 @@ html << begin_div2;
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellNames(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrungsnamen</label><br>\
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellScale(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrskala</label><br>\
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWireframe(this);' checked><div class='topcoat-checkbox__checkmark'></div> Gitternetz</label><br>\
+<br><br>\
+<br><b><u>Navigation</u></b>\
+<br><br>\
+Kamerazentrum neu setzen - 'A'\
 )=====";
 	html << shaderbutton;
 
