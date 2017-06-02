@@ -3546,17 +3546,23 @@ function roundRect(ctx, x, y, w, h, r) {
 
 
 
-var composer, pass;
+var composer, pass, raycaster, controls;
+var mouse = new THREE.Vector2();
 var showShader=true, showWireframe=true, showWellNames=true, toggleWellScale=true;
-
+var sphereInter;
 
 function init() 
 {    
 scene = new THREE.Scene();    
 renderer = new THREE.WebGLRenderer({        
-alpha: false, antialias: false });    
-document.body.appendChild(renderer.domElement);    
+alpha: false, antialias: false });  
+raycaster = new THREE.Raycaster();  
+raycaster.linePrecision = 3;
+document.body.appendChild(renderer.domElement); 
+document.onkeydown = checkKey;
+document.addEventListener('mousemove', onDocumentMouseMove, false);   
 camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 5000000);    
+controls = new THREE.TrackballControls(camera, renderer.domElement);
 initControl();    
 initMaterials();    
 initLights();    
@@ -3564,6 +3570,12 @@ loadObjects();
 setCameraPlace();
 
 updateWellNames();
+
+var sgeometry = new THREE.SphereGeometry(3);
+var smaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+sphereInter = new THREE.Mesh(sgeometry, smaterial);
+sphereInter.visible = false;
+scene.add(sphereInter);
 
 renderer.setClearColor(0xFFFFFF, 1.0);   
 renderer.setSize(window.innerWidth, window.innerHeight); 
@@ -3594,6 +3606,39 @@ pass.renderToScreen = true;
 composer.addPass(pass);composer.render(0.05);
 
 };
+
+function onDocumentMouseMove(event) 
+{
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;    
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);    var intersects = raycaster.intersectObjects(scene.children, true);    if (intersects.length > 0.0) {
+
+        var hovered = intersects[0].point;        sphereInter.visible = true;
+        sphereInter.position.copy(intersects[0].point);
+        sphereInter.translateX(-center_c.x);
+            sphereInter.translateY(-center_c.y);
+            sphereInter.translateZ(-center_c.z);
+    }    else    { sphereInter.visible = false; }
+}
+
+function checkKey(e) 
+{
+    e = e || window.event;
+    if (e.keyCode == '65') // key A
+    {
+        raycaster.setFromCamera(mouse, camera);
+        var intersects = raycaster.intersectObjects(scene.children, true);
+        if (intersects.length > 0.0) {
+            var hovered = intersects[0].point;
+            controls.target.set(hovered.x, hovered.y, hovered.z);
+var xneu = hovered.x - box.x;        
+var yneu = hovered.y - box.y;        
+var zneu = hovered.z - 500;        
+var coordtext = "Koordinaten: " + xneu + "<br>" + yneu + "<br>" + zneu;
+        }
+    }
+}
+
 
 function onWindowResize() 
 {    
@@ -3651,7 +3696,6 @@ function setCameraPlace() {
 };
 
 function initControl() {
-    controls = new THREE.TrackballControls(camera, renderer.domElement);
     controls.rotateSpeed *= 2.0;
     controls.zoomSpeed *= 2.0;
     controls.panSpeed *= 2.0
