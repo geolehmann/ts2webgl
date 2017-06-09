@@ -450,10 +450,10 @@ int main(int argc, char *argv[])
 				}
 
 			}
-			//generate segments
+			//generate SEGMENTS
 			for (int i = 1; i < new_object.vertexnumber; i++)
 			{
-				new_object.segments.push_back(Segment(i, i+1));
+				if (i>2) new_object.segments.push_back(Segment(i, i+1)); // i>2 because otherwise first segment would be double 
 			}
 			objects.push_back(new_object);
 		}
@@ -535,15 +535,16 @@ int main(int argc, char *argv[])
 
 	//------------------------------------------------ ON/OFF TOGGLES --------------------------------------------------------------------------
 	char* toggles = R"=====(
-function toggleShader(cb) 
+function toggleAxes(cb) 
 {	
 if (cb.checked == true) 
 {
-showShader=true;
+axes.visible = true;
+
 } 
 if (cb.checked == false) 
 {
-showShader=false;
+axes.visible = false;
 }
 }
 
@@ -575,14 +576,85 @@ function toggleWireframe(cb)
 {	
 if (cb.checked == true) 
 {
-showWireframe=true;
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Mesh) {
+            child.material.wireframe = true;
+        }
+    });
 } 
 if (cb.checked == false) 
 {
-showWireframe=false;
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Mesh) {
+            child.material.wireframe = false;
+        }
+    });
 }}
+
+function toggleShader(cb) 
+{	
+if (cb.checked == true) 
+{
+
+} 
+if (cb.checked == false) 
+{
+
+}
+}
+
+function togglemarker(cb) 
+{	
+if (cb.checked == true) 
+{
+
+} 
+if (cb.checked == false) 
+{
+
+}
+}
+
 )=====";
 html << toggles;
+
+
+// Marker - Darstellung
+
+
+
+
+for (int32_t i = 0; i < objects.size(); i++)
+{
+	if (objects.at(i).geo == WELL)
+	{
+		std::string markerlist;
+		for (auto m : objects.at(i).markers)
+		{
+			markerlist = markerlist + std::to_string(m.md) + ", ";
+		}
+		markerlist.pop_back(); markerlist.pop_back(); // letztes Komma+Leerzeichen löschen
+		html << "var marker_md" << i << "=[" << markerlist << "];";
+	}
+}
+
+
+
+char* marker_2 = R"=====(
+)=====";
+html << marker_2;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // Legende und K+S - Logo darstellen
@@ -601,13 +673,39 @@ Anhydritmittel (<i>am1</i>)&nbsp;&nbsp;<div style='width:20px;height:10px;border
 Fl&ouml;z Ronnenberg (<i>K3RoSy</i>) OK&nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#3EBAC3; display: inline-block;'></div><br>\
 Fl&ouml;z Ronnenberg (<i>K3RoSy</i>) UK&nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#FFFF00; display: inline-block;'></div><br>\
 <br>\
-<br><br><b><u>Objekte</u></b><br><br>\\"; 
+<b><u>Darstellung</u></b>\
+<br><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleAxes(this);'><div class='topcoat-checkbox__checkmark'></div> Koordinatenachsen</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellNames(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrungsnamen</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellScale(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrskala</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWireframe(this);'><div class='topcoat-checkbox__checkmark'></div> Gitternetz</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleMarker(this);'><div class='topcoat-checkbox__checkmark'></div> Schichtgrenzen</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleShader(this);'><div class='topcoat-checkbox__checkmark'></div> Tiefenunsch&auml;rfe</label><br>\
+<br><br>\
+<br><b><u>Navigation</u></b>\
+<br><br>\
+Kamerazentrum neu setzen - 'A'<br> \ "; 
 text2.style.top = 50 + 'px';
 text2.style.left = 50 + 'px';
 document.body.appendChild(text2);
 </script>
 )=====";
 html << div1;
+
+
+char* nav_div = R"=====(
+<script>
+var text4 = document.createElement('div');
+text4.style.position = 'absolute';
+text4.style.width = 500;
+text4.style.height = 900;
+text4.style.overflow = "hidden";
+text4.style.top = 475 + 'px';
+text4.style.left = 50 + 'px';
+document.body.appendChild(text4);
+</script>
+)=====";
+html << nav_div;
 
 
 char* begin_div2 = R"=====(
@@ -620,6 +718,7 @@ text3.style.overflow = "hidden";
 text3.innerHTML = ")=====";
 html << begin_div2;
 
+html << "<br><br><b><u>Objekte</u></b><br><br>\ ";
 	std::string description;
 	for (int i = 0; i < objects.size(); i++)
 	{
@@ -647,35 +746,21 @@ html << begin_div2;
 		}
 
 
-		html << description << "\\";
+		html << description << "\\ ";
 	}
-
-	char* shaderbutton = R"=====(
-<br><b><u>Darstellung</u></b>\
-<br><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleShader(this);' checked><div class='topcoat-checkbox__checkmark'></div> Shader-Effekte</label><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellNames(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrungsnamen</label><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellScale(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrskala</label><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWireframe(this);' checked><div class='topcoat-checkbox__checkmark'></div> Gitternetz</label><br>\
-<br><br>\
-<br><b><u>Navigation</u></b>\
-<br><br>\
-Kamerazentrum neu setzen - 'A'\
-)=====";
-	html << shaderbutton;
 
 	char* descr_end = R"=====(";)====="; // abschließende "; Zeichen hinzufügen
 	html << descr_end;
 
 	char* end_div2 = R"=====(
-text3.style.top = 300 + 'px';
+text3.style.top = 480 + 'px';
 text3.style.left = 50 + 'px';
 document.body.appendChild(text3);
 </script>
 )=====";
 	html << end_div2;
-	
 
+		
 char* neu = R"=====(
 <script>
 var scene, camera, material, light, ambientLight, renderer;
