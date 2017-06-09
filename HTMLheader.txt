@@ -3544,11 +3544,32 @@ function roundRect(ctx, x, y, w, h, r) {
     ctx.stroke();
 }
 
+function buildAxes( length ) {
+    var axes = new THREE.Object3D();
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( length, 0, 0 ), 0xFF0000, false ) ); // +X
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( -length, 0, 0 ), 0xFF0000, true) ); // -X
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, length, 0 ), 0x00FF00, false ) ); // +Y
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, -length, 0 ), 0x00FF00, true ) ); // -Y
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, length ), 0x0000FF, false ) ); // +Z
+    axes.add( buildAxis( new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, -length ), 0x0000FF, true ) ); // -Z
+    return axes;
+}
 
+function buildAxis( src, dst, colorHex, dashed ) {
+    var geom = new THREE.Geometry(), mat; 
+    if(dashed) { mat = new THREE.LineDashedMaterial({ linewidth: 1, color: colorHex, dashSize: 3, gapSize: 3 });
+    } else { mat = new THREE.LineBasicMaterial({ linewidth: 1, color: colorHex }); }
+    geom.vertices.push( src.clone() );
+    geom.vertices.push( dst.clone() );
+    geom.computeLineDistances(); // This one is SUPER important, otherwise dashed lines will appear as simple plain lines
+    var axis = new THREE.Line( geom, mat, THREE.LinePieces );
+    return axis;
+}
 
-var composer, pass, raycaster, controls;
+var composer, pass, controls;
+var center_c;
 var mouse = new THREE.Vector2();
-var showShader=true, showWireframe=true, showWellNames=true, toggleWellScale=true;
+var showAxes=true, showWireframe=true, showWellNames=true, toggleWellScale=true;
 var sphereInter;
 
 function init() 
@@ -3556,8 +3577,6 @@ function init()
 scene = new THREE.Scene();    
 renderer = new THREE.WebGLRenderer({        
 alpha: false, antialias: false });  
-raycaster = new THREE.Raycaster();  
-raycaster.linePrecision = 3;
 document.body.appendChild(renderer.domElement); 
 document.onkeydown = checkKey;
 document.addEventListener('mousemove', onDocumentMouseMove, false);   
@@ -3570,9 +3589,12 @@ loadObjects();
 setCameraPlace();
 
 updateWellNames();
+axes = buildAxes(1000);
+scene.add(axes);
+axes.visible = false;
 
-var sgeometry = new THREE.SphereGeometry(3);
-var smaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+var sgeometry = new THREE.SphereGeometry(2);
+var smaterial = new THREE.MeshBasicMaterial({ color: 0xffff99 });
 sphereInter = new THREE.Mesh(sgeometry, smaterial);
 sphereInter.visible = false;
 scene.add(sphereInter);
@@ -3581,19 +3603,6 @@ renderer.setClearColor(0xFFFFFF, 1.0);
 renderer.setSize(window.innerWidth, window.innerHeight); 
 window.addEventListener('resize', onWindowResize, false);   
 scene.add(camera);
-
-/*var customShader = {
-            uniforms: {
-                "tDiffuse": {type: "t", value: null},
-                "scale": {type: "f", value: 1.0},
-                "texSize": {type: "v2", value: new THREE.Vector2(50, 50)},
-                "center": {type: "v2", value: new THREE.Vector2(0.5, 0.5)},
-            },
-            vertexShader: document.
-                    getElementById('hexagonVertexShader').text,
-            fragmentShader: document.
-                    getElementById('hexagonFragmentShader').text
-};*/
 
 var renderPass = new THREE.RenderPass(scene, camera);
 var copyPass = new THREE.ShaderPass(THREE.CopyShader);
@@ -3609,15 +3618,30 @@ composer.addPass(pass);composer.render(0.05);
 
 function onDocumentMouseMove(event) 
 {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;    
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);    var intersects = raycaster.intersectObjects(scene.children, true);    if (intersects.length > 0.0) {
+mouse.x = (event.clientX / window.innerWidth) * 2 - 1;    
+mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-        var hovered = intersects[0].point;        sphereInter.visible = true;
+var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
+vector.unproject(camera);
+var ray = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize()); 
+ray.linePrecision = 3;
+var intersects = ray.intersectObjects(meshes, true);
+
+
+
+if (intersects.length > 0.0) 
+{       sphereInter.visible = true;
         sphereInter.position.copy(intersects[0].point);
-        sphereInter.translateX(-center_c.x);
-            sphereInter.translateY(-center_c.y);
-            sphereInter.translateZ(-center_c.z);
+  var hovered = intersects[0].point;
+var xneu = hovered.x - box.x;        
+var yneu = hovered.y - box.y;        
+var zneu = hovered.z - 500;      
+xneu = -1 * xneu.toFixed(3);
+yneu = -1 * yneu.toFixed(3);
+zneu = zneu.toFixed(1);
+  
+text4.innerHTML = "Koordinaten: " + xneu + " " + yneu + " " + zneu;
+
     }    else    { sphereInter.visible = false; }
 }
 
@@ -3626,16 +3650,23 @@ function checkKey(e)
     e = e || window.event;
     if (e.keyCode == '65') // key A
     {
-        raycaster.setFromCamera(mouse, camera);
-        var intersects = raycaster.intersectObjects(scene.children, true);
+
+var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
+vector.unproject(camera);
+var ray = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize()); 
+ray.linePrecision = 3;
+ var intersects = ray.intersectObjects(meshes, true); 
+ 
+if (intersects.length > 0.0) {
         if (intersects.length > 0.0) {
             var hovered = intersects[0].point;
             controls.target.set(hovered.x, hovered.y, hovered.z);
-var xneu = hovered.x - box.x;        
-var yneu = hovered.y - box.y;        
-var zneu = hovered.z - 500;        
-var coordtext = "Koordinaten: " + xneu + "<br>" + yneu + "<br>" + zneu;
+		var xneu = hovered.x - box.x;        
+		var yneu = hovered.y - box.y;        
+		var zneu = hovered.z - 500;        
+		coordtext = "Koordinaten: " + xneu + "<br>" + yneu + "<br>" + zneu;
         }
+      }
     }
 }
 
@@ -3649,12 +3680,9 @@ var render = function render()
 {
 requestAnimationFrame(render);    
 light.position.set(camera.position.x, camera.position.y, camera.position.z);  
-//renderer.render(scene, camera);
 composer.render();
 controls.update();
 };
-
-var center_c;
 
 function setCameraPlace() {
     if (meshes.length == 0) {
@@ -3689,6 +3717,7 @@ function setCameraPlace() {
             meshes[obj].translateX(-center.x);
             meshes[obj].translateY(-center.y);
             meshes[obj].translateZ(-center.z);
+ meshes[obj].updateMatrixWorld();
         }
     }
     camera.position.set(distance * 0.75, distance * 0.75, -distance * 0.75);
