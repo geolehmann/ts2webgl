@@ -116,6 +116,63 @@ std::string rgbToHex(Color rgb)
 double _div = 1.0f; //optionale skalierung
 std::vector<Vertex> allvertices;
 
+enum WellType { NABO, FERN, BEMUST, KEIN };
+
+std::string updateWellNames(std::string name)
+{
+	std::string tmp;
+	tmp = name;
+	WellType bohrtyp;
+	bohrtyp = KEIN;
+	// BP_1042_2017, N609_1_2017            E1_37_2014, E1_1_1_2009, T1_4_3_2009, SAV_9_2014
+	std::size_t nabo = name.find_first_of("N");
+	std::size_t fern1 = name.find_first_of("E");
+	std::size_t fern2 = name.find_first_of("S");
+	std::size_t fern3 = name.find_first_of("T");
+	std::size_t bemust = name.find_first_of("B");
+	if (nabo != std::string::npos) bohrtyp = NABO;
+	if (fern1 != std::string::npos) bohrtyp = FERN;
+	if (fern2 != std::string::npos) bohrtyp = FERN;
+	if (fern3 != std::string::npos) bohrtyp = FERN;
+	if (bemust != std::string::npos) bohrtyp = BEMUST;
+
+	if (bohrtyp == BEMUST)
+	{
+		std::size_t found = tmp.find_first_of("_");
+		tmp[found] = ' ';
+		found = tmp.find_first_of("_", found + 1);
+		tmp[found] = '/';
+	}
+	if (bohrtyp == NABO)
+	{
+		std::size_t found = tmp.find_first_of("_");
+		tmp[found] = char(32); // erstes _ auf jeden Fall durch Leerzeichen ersetzen
+		found = tmp.find_first_of("_", found + 1);
+		tmp[found] = '/';
+	}
+
+	if (bohrtyp == FERN)
+	{
+		std::size_t found = tmp.find_first_of("_");
+		tmp[found] = ' ';
+		std::size_t found2 = tmp.find_first_of("_", found + 1);
+		std::size_t found3 = tmp.find_first_of("_", found2 + 1);
+		if (found2 != std::string::npos && found3 != std::string::npos)
+		{
+			tmp[found2] = '.';
+			tmp[found3] = '/'; // x x.x/2009
+		}
+		if (found2 != std::string::npos && found3 == std::string::npos)
+		{
+			tmp[found2] = '/'; // x x/2009
+		}
+	}
+	return tmp;
+}
+
+
+
+
 int main(int argc, char *argv[])
 {
 	std::cout << "SKUA-GOCAD 2015.5 Surface/Pointset/Curve/Wells to HTML-WEBGL Converter\n";
@@ -123,8 +180,6 @@ int main(int argc, char *argv[])
 	std::cout << "(c) ZI-GEO Christian Lehmann 2017\n\n\n";
 
 	openDialog();
-
-	//filename = "testneu2";
 
 	std::ifstream ifs(filename.c_str(), std::ifstream::in);
 	if (!ifs.good())
@@ -521,14 +576,16 @@ int main(int argc, char *argv[])
 	{
 		if (objects.at(i).geo == WELL)
 		{
+			std::string newname;
+			newname = updateWellNames(objects.at(i).name);
 			std::string sprites1 = "var spritey";
 			std::string sprites2 = " = makeTextSprite('";
-			std::string sprites3 = "',{ fontsize: 24, borderColor: { r: 0, g: 0, b: 0, a: 0.0 }, backgroundColor: { r: 0, g: 0, b: 0, a: 0.0 } });	spritey";
+			std::string sprites3 = "',{ fontsize: 15, borderColor: { r: 0, g: 0, b: 0, a: 0.0 }, backgroundColor: { r: 0, g: 0, b: 0, a: 0.0 } });	spritey";
 			std::string sprites4 = ".position.set(";
 			std::string sprites4_2 = std::to_string(objects.at(i).vertices.at(objects.at(i).vertices.size() / 2).x - box_middle.x) + ", " + std::to_string(objects.at(i).vertices.at(objects.at(i).vertices.size() / 2).y - box_middle.y) + ", " + std::to_string(objects.at(i).vertices.at(objects.at(i).vertices.size() / 2).z - box_middle.z);
 			std::string sprites4_3 = "); scene.add(spritey";
 			std::string sprites5 = "); ";
-			html << sprites1 << i << sprites2 << objects.at(i).name << sprites3 << i << sprites4 << sprites4_2 << sprites4_3 << i << sprites5;
+			html << sprites1 << i << sprites2 << newname << sprites3 << i << sprites4 << sprites4_2 << sprites4_3 << i << sprites5;
 			std::string t = "spritey" + std::to_string(i);			std::string t1 = ".translateX(-center_c.x);";			std::string t2 = ".translateY(-center_c.y);";			std::string t3 = ".translateZ(-center_c.z);";
 			html << t << t1 << t << t2 << t << t3;
 		}
@@ -581,15 +638,24 @@ showWellNames=false;
 updateWellNames();
 }
 
-function toggleWellScale(cb) 
+function toggleScale(cb) 
 {	
 if (cb.checked == true) 
 {
-
+scene.traverse(function (child) {
+ if (child instanceof THREE.Line) {
+            if (child.geometry.vertices.length == 2) {child.visible = true;   }
+        }
+ if (child instanceof THREE.Sprite) { child.visible = true; }
+});
 } 
 if (cb.checked == false) 
 {
-
+scene.traverse(function (child) {
+ if (child instanceof THREE.Line) {            if (child.geometry.vertices.length == 2) {child.visible = false;   }
+        }
+ if (child instanceof THREE.Sprite) { child.visible = false; }
+});
 }}
 
 function toggleWireframe(cb) 
@@ -597,7 +663,7 @@ function toggleWireframe(cb)
 if (cb.checked == true) 
 {
     scene.traverse(function (child) {
-        if (child instanceof THREE.Mesh) {
+        if (child instanceof THREE.Mesh) if (child.material.type == "MeshLambertMaterial") {
             child.material.wireframe = true;
         }
     });
@@ -605,8 +671,27 @@ if (cb.checked == true)
 if (cb.checked == false) 
 {
     scene.traverse(function (child) {
-        if (child instanceof THREE.Mesh) {
+        if (child instanceof THREE.Mesh) if (child.material.wireframe == true) {
             child.material.wireframe = false;
+        }
+    });
+}}
+
+function toggleSurfaces(cb) 
+{	
+if (cb.checked == true) 
+{
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Mesh) if (child.material.type == "MeshLambertMaterial") {
+            child.visible = true;
+        }
+    });
+} 
+if (cb.checked == false) 
+{
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Mesh) if (child.material.type == "MeshLambertMaterial") {
+            child.visible = false;
         }
     });
 }}
@@ -627,6 +712,7 @@ function toggleMarker(cb)
 {	
 if (cb.checked == true) 
 {
+text5.style.visibility='visible';
     scene.traverse(function (child) {
         if (child instanceof THREE.Mesh) {
             if (child.geometry.type == "SphereBufferGeometry") child.visible = true;
@@ -635,9 +721,30 @@ if (cb.checked == true)
 } 
 if (cb.checked == false) 
 {
+text5.style.visibility='hidden';
     scene.traverse(function (child) {
         if (child instanceof THREE.Mesh) {
             if (child.geometry.type == "SphereBufferGeometry") child.visible = false;
+        }
+    });
+}
+}
+
+function toggleWells(cb) 
+{	
+if (cb.checked == true) 
+{
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Line) {
+            if (child.material.color.r == 1 && child.material.color.g < 0.01 && child.material.color.b < 0.01 && child.material.color.g > 0.00 && child.material.color.b > 0.00) child.visible = true;
+        }
+    });
+} 
+if (cb.checked == false) 
+{
+    scene.traverse(function (child) {
+        if (child instanceof THREE.Line) {
+            if (child.material.color.r == 1 && child.material.color.g < 0.01 && child.material.color.b < 0.01 && child.material.color.g > 0.00 && child.material.color.b > 0.00) child.visible = false;
         }
     });
 }
@@ -649,7 +756,6 @@ html << toggles;
 
 // Legende und K+S - Logo darstellen
 char* div1 = R"=====(
-
 var text2 = document.createElement('div');
 text2.style.position = 'absolute';
 //text2.style.zIndex = 1;
@@ -660,10 +766,11 @@ text2.innerHTML = "<img height='42' width='42' src='data:image/png;base64,iVBORw
 <b><u>Darstellung</u></b>\
 <br><br>\
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleAxes(this);'><div class='topcoat-checkbox__checkmark'></div> Koordinatenachsen</label><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellNames(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrungsnamen</label><br>\
-		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellScale(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrskala</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWellNames(this);'><div class='topcoat-checkbox__checkmark'></div> Bohrungsnamen</label><br>\
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWireframe(this);'><div class='topcoat-checkbox__checkmark'></div> Gitternetz</label><br>\
 		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleMarker(this);'><div class='topcoat-checkbox__checkmark'></div> Schichtgrenzen</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleWells(this);' checked><div class='topcoat-checkbox__checkmark'></div> Bohrungen</label><br>\
+		<label class='topcoat-checkbox'><input type='checkbox' onclick='toggleSurfaces(this);' checked><div class='topcoat-checkbox__checkmark'></div> Fl&auml;chen</label><br>\
 <br><br>\
 <br><b><u>Navigation</u></b>\
 <br><br>\
@@ -677,6 +784,20 @@ document.body.appendChild(text2);
 </script>
 )=====";
 html << div1;
+
+char* c_div = R"=====(
+<script>
+var text1 = document.createElement('div');
+text1.style.position = 'absolute';
+text1.style.width = 400;
+text1.style.height = 900;
+text1.style.overflow = "hidden";
+text1.style.top = 475 + 'px';
+text1.style.left = 50 + 'px';
+document.body.appendChild(text1);
+</script>
+)=====";
+html << c_div;
 
 
 char* nav_div = R"=====(
@@ -701,21 +822,35 @@ text5.style.width = 200;
 text5.style.top = 10;
 text5.align = 'right';
 text5.style.right = 10;
-text5.style.height = 400;
+text5.style.height = 900;
+text5.style.visibility='hidden';
 text5.innerHTML = "<b><u>Schichtgrenzen</u></b>\
 <br><br>\
-<i>am3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00cc66; display: inline-block;'></div><br>\
-<i>am2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00ff86; display: inline-block;'></div><br>\
-<i>am1</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#66ffb2; display: inline-block;'></div><br>\
-<i>Na3&beta;2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#66ffff; display: inline-block;'></div><br>\
-<i>K3RoSyOK</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#ffff66; display: inline-block;'></div><br>\
-<i>K3RoSyUK</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#ffe666; display: inline-block;'></div><br>\
-<i>Na3&beta;1</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#e5ffcc; display: inline-block;'></div><br>\
-<i>K3RoCt</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#ff9999; display: inline-block;'></div><br>\
-<i>Na3&alpha;</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#cce5ff; display: inline-block;'></div><br>\
-<i>A3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00ff00; display: inline-block;'></div><br>\
-<i>T3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#006633; display: inline-block;'></div><br>\
-<i>K2Ct</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#ffcccc; display: inline-block;'></div><br>\
+<i>A4</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FA9A; display: inline-block;'></div><br>\
+<i>T4</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#808000; display: inline-block;'></div><br>\
+<i>Na3_i</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#AFEEEE; display: inline-block;'></div><br>\
+<i>Na3_h4</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00ff86; display: inline-block;'></div><br>\
+<i>am4</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#008080; display: inline-block;'></div><br>\
+<i>Na3_h3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FA9A; display: inline-block;'></div><br>\
+<i>am3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#008080; display: inline-block;'></div><br>\
+<i>Na3_h2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FA9A; display: inline-block;'></div><br>\
+<i>am2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#008080; display: inline-block;'></div><br>\
+<i>Na3_h1</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FA9A; display: inline-block;'></div><br>\
+<i>am1</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#008080; display: inline-block;'></div><br>\
+<i>Na3&beta;2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#87CEEB; display: inline-block;'></div><br>\
+<i>K3RoSyOK</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#FFD700; display: inline-block;'></div><br>\
+<i>K3RoSyUK</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#FFFF00; display: inline-block;'></div><br>\
+<i>K3RoNa</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#0000FF; display: inline-block;'></div><br>\
+<i>K3RoCt</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#FF0000; display: inline-block;'></div><br>\
+<i>Na3&beta;1</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#7FFFD4; display: inline-block;'></div><br>\
+<i>Na3&alpha;</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FFFF; display: inline-block;'></div><br>\
+<i>A3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00FF00; display: inline-block;'></div><br>\
+<i>T3</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#778899; display: inline-block;'></div><br>\
+<i>A2r</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#7FFFD4; display: inline-block;'></div><br>\
+<i>Na2r</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#00BFFF; display: inline-block;'></div><br>\
+<i>K2Ct</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#DC143C; display: inline-block;'></div><br>\
+<i>Na2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#4169E1; display: inline-block;'></div><br>\
+<i>A2</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#008B8B; display: inline-block;'></div><br>\
 <i>Unbekannt</i> &nbsp;&nbsp;<div style='width:20px;height:10px;border:1px; background-color:#c0c0c0; display: inline-block;'></div><br>\
 \
 \
@@ -728,7 +863,7 @@ html << legend_div;
 
 
 char* begin_div2 = R"=====(
-   <div class="hide-scroll" style="overflow:hidden;position:absolute; height:500; width:330; top:480px; left:50px;">
+   <div class="hide-scroll" style="overflow:hidden;position:absolute; height:500; width:330; top:510px; left:50px;">
     <div class="viewport" style="overflow:auto;max-height:100%; margin-right:-100px; padding-right:100px;">
 )=====";
 html << begin_div2;
@@ -742,26 +877,28 @@ html << "<br><br><b><u>Objekte</u></b><br><br>\ ";
 		if (objects.at(i).geo == SyUK || objects.at(i).geo == SyUKREF) objects.at(i).color = Color(255, 255, 0);
 		if (objects.at(i).geo == SyOK || objects.at(i).geo == SyOKREF) objects.at(i).color = Color(62, 186, 195);
 		
-		std::string switch_button_p1 = "<label class='topcoat-checkbox'><input type='checkbox' onclick='handleClick";
-		std::string switch_button_p2 = "(this);' checked><div class='topcoat-checkbox__checkmark'></div>  </label>\ ";
-		html << switch_button_p1 << i << switch_button_p2;
-
-		if (objects.at(i).type == SURF)
+		if (objects.at(i).geo != WELL) 
 		{
-			description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAApAQMAAACm11OpAAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAABlSURBVBjTlcyxDcAgEENREAUlIzAKo8FoGYURKCkiHGFfpChV4uYVlr5zn+ebDIeMXaYh8zRPWcy6JKAM0J4GgMEIMJiAYTKYzQIwWIGlnIKm3zbmGIzbbg7maN5O5hh8e/8/dwFGR15S93ZRvAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0wNS0xOVQwNzowMzoxMS0wNDowMN5V65MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMDUtMTlUMDc6MDM6MTEtMDQ6MDCvCFMvAAAAAElFTkSuQmCC'></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
-		}
-		if (objects.at(i).type == PLINE)
-		{
-			description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAAwAQMAAACCDgD6AAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAAB7SURBVBjTfdChDYAwEIXhNhVIRugKIFFdiQkAyVgIwhx1WGQF4Ui4HxKawJnPvL7c1ZifaTEpblQL9JsaotoPF1aI72qZsvikCvGD1iz+tBJfWWbBGXlmOgyZfqB3elvQ77a3NmXFtz02LFzLjnJVeZFKD0OLxsXPLz4BhSUrjSOuFFcAAAAldEVYdGRhdGU6Y3JlYXRlADIwMTctMDUtMTlUMDc6MDI6MjMtMDQ6MDAoh5ZnAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE3LTA1LTE5VDA3OjAyOjIzLTA0OjAwWdou2wAAAABJRU5ErkJggg=='></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
-		}
+			std::string switch_button_p1 = "<label class='topcoat-checkbox'><input type='checkbox' onclick='handleClick";
+			std::string switch_button_p2 = "(this);' checked><div class='topcoat-checkbox__checkmark'></div>  </label>\ ";
+			html << switch_button_p1 << i << switch_button_p2;
 
-		if (objects.at(i).type == PTS)
-		{
-			description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAApAQMAAAB9bPmLAAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAABiSURBVAjXY2BABXxgUh5M2jegk/JIaoCAGUyyg6X4DzB8AJGMP0Ak8x+QOIhkZgCRDAwgcSAAqmGQAbPsGNiBZD0DfwOIlD8AI+3AIjJgWSyA8QHY5g9gm3+gkxBxiBo8AADtFhio/JV8WgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0wNS0xOVQwNzowMjo0NS0wNDowMI04qtoAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMDUtMTlUMDc6MDI6NDUtMDQ6MDD8ZRJmAAAAAElFTkSuQmCC'></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
+			if (objects.at(i).type == SURF)
+			{
+				description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAApAQMAAACm11OpAAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAABlSURBVBjTlcyxDcAgEENREAUlIzAKo8FoGYURKCkiHGFfpChV4uYVlr5zn+ebDIeMXaYh8zRPWcy6JKAM0J4GgMEIMJiAYTKYzQIwWIGlnIKm3zbmGIzbbg7maN5O5hh8e/8/dwFGR15S93ZRvAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0wNS0xOVQwNzowMzoxMS0wNDowMN5V65MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMDUtMTlUMDc6MDM6MTEtMDQ6MDCvCFMvAAAAAElFTkSuQmCC'></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
+			}
+			if (objects.at(i).type == PLINE)
+			{
+				description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADEAAAAwAQMAAACCDgD6AAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAAB7SURBVBjTfdChDYAwEIXhNhVIRugKIFFdiQkAyVgIwhx1WGQF4Ui4HxKawJnPvL7c1ZifaTEpblQL9JsaotoPF1aI72qZsvikCvGD1iz+tBJfWWbBGXlmOgyZfqB3elvQ77a3NmXFtz02LFzLjnJVeZFKD0OLxsXPLz4BhSUrjSOuFFcAAAAldEVYdGRhdGU6Y3JlYXRlADIwMTctMDUtMTlUMDc6MDI6MjMtMDQ6MDAoh5ZnAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE3LTA1LTE5VDA3OjAyOjIzLTA0OjAwWdou2wAAAABJRU5ErkJggg=='></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
+			}
+
+			if (objects.at(i).type == PTS)
+			{
+				description = " <img height='20' width='20' src=' data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAApAQMAAAB9bPmLAAAABlBMVEX///9wkr5unc09AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAAEgAAABIAEbJaz4AAABiSURBVAjXY2BABXxgUh5M2jegk/JIaoCAGUyyg6X4DzB8AJGMP0Ak8x+QOIhkZgCRDAwgcSAAqmGQAbPsGNiBZD0DfwOIlD8AI+3AIjJgWSyA8QHY5g9gm3+gkxBxiBo8AADtFhio/JV8WgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0wNS0xOVQwNzowMjo0NS0wNDowMI04qtoAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMDUtMTlUMDc6MDI6NDUtMDQ6MDD8ZRJmAAAAAElFTkSuQmCC'></img> " + objects.at(i).name + " <div style='width:20px;height:10px;border:1px; background-color:" + rgbToHex(objects.at(i).color) + "; display: inline-block;'></div> <br> ";
+			}
+
+			html << description << "\ ";
 		}
-
-
-		html << description << "\ ";
 	}
 
 	//char* descr_end = R"=====(";)====="; // abschließende "; Zeichen hinzufügen
@@ -792,7 +929,7 @@ var meshes = [];
 			{
 				data = data + std::to_string(v.x - box_middle.x) + ", " + std::to_string(v.y - box_middle.y) + ", " + std::to_string(v.z - box_middle.z) + ", ";
 				forcounter++;
-				if (forcounter >= 10000) { fprintf_s(stderr, "Processed %lu vertices out of %lu..\n", forcounter*icounter, objects.at(i).vertices.size()); forcounter = 0; icounter++; }
+				if (forcounter >= 10000) { fprintf_s(stderr, "Processed %lu segments out of %lu..\n", forcounter*icounter, objects.at(i).vertices.size()); forcounter = 0; icounter++; }
 			}
 			for (auto t : objects.at(i).triangles)data = data + std::to_string(t.v1) + ", " + std::to_string(t.v2) + ", " + std::to_string(t.v3) + ", ";
 
@@ -819,20 +956,31 @@ var meshes = [];
 				markerlist = markerlist + std::to_string(m.md) + ", ";
 
 				name_id = 666;
-				if (m.name.find("am4") != std::string::npos) name_id = -3;
-				if (m.name.find("am3") != std::string::npos) name_id = -2;
-				if (m.name.find("am2") != std::string::npos) name_id = -1;
+				if (m.name.find("A4") != std::string::npos) name_id = -10;
+				if (m.name.find("T4") != std::string::npos) name_id = -9;
+				if (m.name.find("Na3_i") != std::string::npos) name_id = -8;
+				if (m.name.find("Na3_h4") != std::string::npos) name_id = -7;
+				if (m.name.find("am4") != std::string::npos) name_id = -6;
+				if (m.name.find("Na3_h3") != std::string::npos) name_id = -5;
+				if (m.name.find("am3") != std::string::npos) name_id = -4;
+				if (m.name.find("Na3_h2") != std::string::npos) name_id = -3;
+				if (m.name.find("am2") != std::string::npos) name_id = -2;
+				if (m.name.find("Na3_h1") != std::string::npos) name_id = -1;
 				if (m.name.find("am1") != std::string::npos) name_id = 0;
 				if (m.name.find("Na3_b2") != std::string::npos) name_id = 1;
 				if (m.name.find("K3RoSyOK") != std::string::npos) name_id = 2;
 				if (m.name.find("K3RoSyUK") != std::string::npos) name_id = 3;
-				if (m.name.find("Na3_b1") != std::string::npos) name_id = 4;
+				if (m.name.find("K3RoNa") != std::string::npos) name_id = 4;
 				if (m.name.find("K3RoCt") != std::string::npos) name_id = 5;
-				if (m.name.find("Na3_a") != std::string::npos) name_id = 6;
-				if (m.name.find("A3") != std::string::npos) name_id = 7;
-				if (m.name.find("T3") != std::string::npos) name_id = 8;
-				if (m.name.find("K2Ct") != std::string::npos) name_id = 9;
-				if (m.name.find("Na2") != std::string::npos) name_id = 10;
+				if (m.name.find("Na3_b1") != std::string::npos) name_id = 6;
+				if (m.name.find("Na3_a") != std::string::npos) name_id = 7;
+				if (m.name.find("A3") != std::string::npos) name_id = 8;
+				if (m.name.find("T3") != std::string::npos) name_id = 9;
+				if (m.name.find("A2r") != std::string::npos) name_id = 10;
+				if (m.name.find("Na2r") != std::string::npos) name_id = 11;
+				if (m.name.find("K2Ct") != std::string::npos) name_id = 12;
+				if (m.name.find("Na2OK") != std::string::npos || m.name.find("Na2UK") != std::string::npos) name_id = 13;
+				if (m.name.find("A2OK") != std::string::npos || m.name.find("A2UK") != std::string::npos) name_id = 14;
 
 				markernames = markernames + std::to_string(name_id) + ", ";
 			}
@@ -842,6 +990,16 @@ var meshes = [];
 		html << "var marker" << i << " =[" << markerlist << "];";
 		html << "var mrk_names" << i << " =[" << markernames << "];";
 	}
+
+	/*std::string namelist;
+	for (int32_t i = 0; i < objects.size(); i++)
+	{
+		namelist = namelist + objects.at(i).name + ", ";
+	}
+	if (namelist != "") { namelist.pop_back(); namelist.pop_back(); } // letztes Komma+Leerzeichen löschen
+	html << "var namelist =[" << namelist << "];";*/
+
+
 
 	fprintf_s(stderr, "Finished converting mesh. Started generating HTML file...\n");
 
@@ -859,17 +1017,18 @@ var i = 0;
 	int32_t htmlcounter = 0;
 		for (int i = 0; i < objects.size(); i++)
 		{
+			if (objects.at(i).geo == WELL) objects.at(i).name = updateWellNames(objects.at(i).name); //neu
 			std::string assign_start;
 			if (objects.at(i).type == SURF) 
 			{
 				// Surface
-				assign_start = "loadTSurf(";
+				assign_start = "loadTSurf('" + objects.at(i).name + "', ";
 			}
 
 			else if (objects.at(i).type == PTS)
 			{
 				// Surface
-				assign_start = "loadVSet(";
+				assign_start = "loadVSet('" + objects.at(i).name + "', ";
 			}
 			else
 			{
@@ -894,10 +1053,10 @@ var i = 0;
 				html << indices_end;
 
 				if (objects.at(i).geo == WELL) {
-					assign_start = "loadWellSpline(marker" + std::to_string(i) + ", mrk_names" + std::to_string(i) +", ";
+					assign_start = "loadWellSpline('" + objects.at(i).name + "', marker" + std::to_string(i) + ", mrk_names" + std::to_string(i) +", ";
 				}
 				else {
-					assign_start = "loadPLine(";
+					assign_start = "loadPLine('" + objects.at(i).name + "', ";
 				}
 			}
 			std::string name = "object" + std::to_string(i);
@@ -912,7 +1071,9 @@ var i = 0;
 			//if (ident.gtype.at(i) == UNDEF) color_middle = std::string("0") + std::string(", ") + std::string("0") + std::string(", ") + std::string("0");
 			if (objects.at(i).geo == am1UK || objects.at(i).geo == am1REF) color_middle = std::string("0") + std::string(", ") + std::string("255") + std::string(", ") + std::string("123");
 			if (objects.at(i).geo == SyUK || objects.at(i).geo == SyUKREF) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
-			if (objects.at(i).geo == SyOK || objects.at(i).geo == SyOKREF) color_middle = std::string("62") + std::string(", ") + std::string("186") + std::string(", ") + std::string("195");
+			if (objects.at(i).geo == SyOK || objects.at(i).geo == SyOKREF) color_middle = std::string("62") + std::string(", ") + std::string("186") + std::string(", ") + std::string("195");			
+			if (objects.at(i).geo == WELL) color_middle = std::string("255") + std::string(", ") + std::string("1") + std::string(", ") + std::string("1");
+			if (objects.at(i).name.find("loez") != std::string::npos || objects.at(i).name.find("löz") != std::string::npos) color_middle = std::string("255") + std::string(", ") + std::string("255") + std::string(", ") + std::string("0");
 			char* transparency = R"=====(
 			meshes[i].material.transparent = true;		
 			meshes[i].material.opacity = 0.6;
